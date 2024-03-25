@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+    tools {
+        jdk 'Java17'
+    }
+    triggers {
+        pollSCM('* * * * *')
+    }
+    parameters {
+        booleanParam(
+            name: 'api_gateway',
+            defaultValue: true,
+            description: 'Run the API Gateway service'
+        )
+        booleanParam(
+            name: 'config_server',
+            defaultValue: true,
+            description: 'Run the Config Server service'
+        )
+        booleanParam(
+            name: 'discovery_server',
+            defaultValue: true,
+            description: 'Run the Discovery Server service'
+        )
+        booleanParam(
+            name: 'range_service',
+            defaultValue: true,
+            description: 'Run the Range Service'
+        )
+        booleanParam(
+            name: 'url_shortener_service',
+            defaultValue: true,
+            description: 'Run the URL Shortener Service'
+        )
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM',
+                branches: [[name: 'master']],
+                userRemoteConfigs: [[url: 'https://github.com/baakapps/url-shortener-project.git']]])
+            }
+        }
+        stage('Build Services') {
+            when {
+                expression {
+                    return params.api_gateway || params.config_server || params.discovery_server || params.range_service || params.url_shortener_service
+                }
+            }
+            steps {
+                script {
+                    def services = ['api-gateway', 'config-server', 'discovery-server', 'range-service', 'url-shortener-service']
+                    for (def service : services) {
+                        if (params."${service.replaceAll('-', '_')}") {
+                            buildService(service)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def buildService(service) {
+    sh "cd ${service} && mvn clean package"
+}
